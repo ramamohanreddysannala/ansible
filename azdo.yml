@@ -1,0 +1,100 @@
+---
+ - hosts: localhost
+   become: yes
+   vars_files: 
+      - '/etc/ansible/secrets.yml'
+
+   tasks:
+    - name: Add user
+      user:
+        name: '{{ user }}'
+        groups: wheel
+        state: present
+        shell: /bin/bash
+      register: user_status
+
+    - name: display user status
+      debug:
+        msg: "{{ user_status }}"
+
+    - name: check user in sudoers file
+      shell: 
+        cmd: "cat /etc/sudoers | grep '{{ user }}'"
+      register: grep
+      ignore_errors: yes
+      when: user_status.state == "present"
+
+    - name: Display user in sudoers file
+      debug: 
+        msg: "{{ grep }}"
+     
+
+    - name: Add user to sudo file
+      shell: 
+        cmd: 'echo "{{ user }} ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers'
+      when: grep.rc != 0
+
+    - name: Create Agent directories
+      file:
+       state: directory
+       path: /opt/Azdo_Agent
+       owner: '{{ user }}'
+       group: '{{ user }}'
+       mode: 0755
+
+
+    - name: Download and unarchive
+      unarchive: 
+        src: https://vstsagentpackage.azureedge.net/agent/2.173.0/vsts-agent-linux-x64-2.173.0.tar.gz
+        dest: /opt/Azdo_Agent
+        remote_src: yes
+        owner: Azdo_Agent
+        group: Azdo_Agent
+        creates: /opt/Azdo_Agent/config.sh
+
+
+    - name: Configure agent
+      shell: 
+        cmd: './config.sh --unattended --acceptTeeEula --url "https://dev.azure.com/rammohanreddy434" --auth pat --token "{{ token }}" --pool galaxy --agent galaxy'
+        chdir: /opt/Azdo_Agent/
+      become: true
+      become_user: Azdo_Agent
+      ignore_errors: yes
+     
+      register: config_status
+
+    - name: display config
+      debug: 
+        #msg: "{{ config_status.failed }}"
+        var: config_status.failed
+
+
+    - name: Configure agent as a service
+      shell:
+        cmd: 'sudo ./svc.sh install'
+        chdir: /opt/Azdo_Agent/
+      when: config_status.failed == false
+      become: true
+      #become_user: root
+      ignore_errors: yes
+
+      register: agent_service_config_status
+
+    - name: display agent service config status
+      debug:
+        msg: "{{ agent_service_config_status }}"
+
+
+    - name: Start agent
+      shell:
+        cmd: 'sudo ./svc.sh start'
+        chdir: /opt/Azdo_Agent/
+      become: true
+      #become_user: root
+      #ignore_errors: yes
+
+      register: agent_status
+
+    - name: display agent status
+      debug:
+        msg: "{{ agent_status }}"
