@@ -2,7 +2,7 @@
  - hosts: localhost
    become: yes
    vars_files: 
-      - '/etc/ansible/secrets.yml'
+      - '/etc/ansible/ansible/secrets.yml'
 
    tasks:
     - name: Add user
@@ -37,7 +37,7 @@
     - name: Create Agent directories
       file:
        state: directory
-       path: /opt/Azdo_Agent
+       path: '{{ agent_directory }}'
        owner: '{{ user }}'
        group: '{{ user }}'
        mode: 0755
@@ -46,19 +46,19 @@
     - name: Download and unarchive
       unarchive: 
         src: https://vstsagentpackage.azureedge.net/agent/2.173.0/vsts-agent-linux-x64-2.173.0.tar.gz
-        dest: /opt/Azdo_Agent
+        dest: '{{ agent_directory }}'
         remote_src: yes
-        owner: Azdo_Agent
-        group: Azdo_Agent
+        owner: '{{ user }}'
+        group: '{{ user }}'
         creates: /opt/Azdo_Agent/config.sh
 
 
     - name: Configure agent
       shell: 
         cmd: './config.sh --unattended --acceptTeeEula --url "https://dev.azure.com/rammohanreddy434" --auth pat --token "{{ token }}" --pool galaxy --agent galaxy'
-        chdir: /opt/Azdo_Agent/
+        chdir: '{{ agent_directory }}'
       become: true
-      become_user: Azdo_Agent
+      become_user: '{{ user }}'
       ignore_errors: yes
      
       register: config_status
@@ -72,7 +72,7 @@
     - name: Configure agent as a service
       shell:
         cmd: 'sudo ./svc.sh install'
-        chdir: /opt/Azdo_Agent/
+        chdir: '{{ agent_directory }}'
       when: config_status.failed == false
       become: true
       #become_user: root
@@ -88,7 +88,7 @@
     - name: Start agent
       shell:
         cmd: 'sudo ./svc.sh start'
-        chdir: /opt/Azdo_Agent/
+        chdir: '{{ agent_directory }}'
       become: true
       #become_user: root
       #ignore_errors: yes
