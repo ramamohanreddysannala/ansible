@@ -56,6 +56,9 @@
       #ignore_errors: yes
       register: agent_service_config_status
 
+    #- name: Agent service name capture
+      #debug: 
+        #msg: "{{ agent_service_config_status.stdout }}"
 
     - set_fact:
         service: "{{ agent_service_config_status.stdout | regex_search(regexp,'\\1') }}"
@@ -63,6 +66,8 @@
         regexp: '(vsts.*\.service).?'
       when: agent_service_config_status.changed
    
+    # - debug:
+        #var: service
 
     - name: Start service Azdo agent, if not started
       service:
@@ -71,4 +76,24 @@
       with_items: "{{ service }}"
       when: agent_service_config_status.changed
 
+
+   # - name: Start agent
+      #shell:
+        #cmd: 'sudo ./svc.sh start'
+        #chdir: '{{ agent_directory }}'
+      #become: true
+      #become_user: root
+      #ignore_errors: yes
+      #register: agent_status
+
+    #- name: Agent Status
+      #debug: 
+        #msg: "{{ agent_status.stdout }}"
+
+    #- set_fact:
+        #service: "{{ agent_status.stdout | regex_search(regexp,'\\1') }}"
+      #vars:
+        #regexp: 'loaded.*(vsts.*\.service).?'
+    #- debug:
+        #var: service
 
