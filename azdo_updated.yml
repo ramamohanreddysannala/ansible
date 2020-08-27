@@ -1,0 +1,66 @@
+---
+ - hosts: localhost
+   become: yes
+   vars_files: 
+      - '/etc/ansible/ansible/secrets.yml'
+
+   tasks:
+    - name: Add user
+      user:
+        name: '{{ user }}'
+        groups: wheel
+        state: present
+        shell: /bin/bash
+      register: user_status
+
+    - name: add user to sudoers
+      lineinfile: 
+        path: /etc/sudoers
+        line: "{{ user }} ALL=(ALL:ALL) NOPASSWD: ALL"
+      register: grep
+      when: user_status.state == "present"
+
+    - name: Create Agent directories
+      file:
+       state: directory
+       path: '{{ agent_directory }}'
+       owner: '{{ user }}'
+       group: '{{ user }}'
+       mode: 0755
+
+    - name: Download and unarchive
+      unarchive: 
+        src: https://vstsagentpackage.azureedge.net/agent/2.173.0/vsts-agent-linux-x64-2.173.0.tar.gz
+        dest: '{{ agent_directory }}'
+        remote_src: yes
+        owner: '{{ user }}'
+        group: '{{ user }}'
+
+    - name: Configure agent
+      shell: 
+        cmd: './config.sh --unattended --acceptTeeEula --url "https://dev.azure.com/rammohanreddy434" --auth pat --token "{{ token }}" --pool galaxy --agent galaxy'
+        chdir: '{{ agent_directory }}'
+      become: true
+      become_user: '{{ user }}'
+      ignore_errors: yes
+      register: config_status
+
+    - name: Configure agent as a service
+      shell:
+        cmd: 'sudo ./svc.sh install {{ user }}'
+        chdir: '{{ agent_directory }}'
+      when: config_status.failed == false
+      become: true
+      #become_user: root
+      #ignore_errors: yes
+      register: agent_service_config_status
+
+    - name: Start agent
+      shell:
+        cmd: 'sudo ./svc.sh start'
+        chdir: '{{ agent_directory }}'
+      become: true
+      #become_user: root
+      #ignore_errors: yes
+      register: agent_status
+
